@@ -12,12 +12,16 @@ RSpec.describe 'sucker_punch instrumentation' do
     SuckerPunch::RUNNING.make_true
   end
 
+  let(:expect_thread?) { true }
+
   after do
     count = Thread.list.size
 
     SuckerPunch::RUNNING.make_false
     SuckerPunch::Queue.all.each(&:shutdown)
     SuckerPunch::Queue.clear
+
+    next unless expect_thread?
 
     # Unfortunately, SuckerPunch queues (which are concurrent-ruby
     # ThreadPoolExecutor instances) don't have an interface that
@@ -138,6 +142,59 @@ RSpec.describe 'sucker_punch instrumentation' do
       expect(enqueue_span.resource).to eq("ENQUEUE #{worker_class}")
       expect(enqueue_span.get_tag('sucker_punch.queue')).to eq(worker_class.to_s)
       expect(enqueue_span.get_tag('sucker_punch.perform_in')).to eq(0)
+    end
+  end
+
+  context 'keyword arguments' do
+    # We do not want mocks or stubs here, as these would define their own
+    # wrapper or replacement methods interfering with the argument passing
+    # test, therefore we record behaviour data on a side-effect of an object.
+    let(:recorded) { [] }
+
+    let(:worker_class) do
+      Class.new do
+        include SuckerPunch::Job
+
+        def perform(*args, required:)
+          self.class.instance_variable_get(:@recorded) << [args, required]
+        end
+      end.tap do |clazz|
+        clazz.instance_variable_set(:@recorded, recorded)
+      end
+    end
+
+    context 'internal call to job' do
+      subject(:dummy_worker) { worker_class.__run_perform(1, required: 2) }
+      let(:expect_thread?) { false }
+
+      it 'passes kwargs correctly through instrumentation' do
+        dummy_worker
+        try_wait_until { recorded.any? }
+
+        expect(recorded.first).to eq([[1], 2])
+      end
+    end
+
+    context 'async job' do
+      subject(:dummy_worker) { worker_class.perform_async(1, required: 2) }
+
+      it 'passes kwargs correctly through instrumentation' do
+        dummy_worker
+        try_wait_until { recorded.any? }
+
+        expect(recorded.first).to eq([[1], 2])
+      end
+    end
+
+    context 'delayed job' do
+      subject(:dummy_worker) { worker_class.perform_in(0, 1, required: 2) }
+
+      it 'passes kwargs correctly through instrumentation' do
+        dummy_worker
+        try_wait_until { recorded.any? }
+
+        expect(recorded.first).to eq([[1], 2])
+      end
     end
   end
 end
