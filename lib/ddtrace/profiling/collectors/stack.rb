@@ -164,6 +164,19 @@ module Datadog
 
         def get_trace_identifiers(thread)
           return unless thread.is_a?(::Thread)
+
+          if defined?(::OpenTelemetry::Context::KEY)
+            # Awful hack to make sure we don't race with another thread that's setting up opentelemetry as well
+            require 'opentelemetry/sdk'
+            current_span = ::OpenTelemetry::Trace.current_span(thread[::OpenTelemetry::Context::KEY])
+
+            if (current_span && current_span != ::OpenTelemetry::Trace::Span::INVALID)
+              result = [current_span.context.hex_trace_id[16..-1].to_i(16), current_span.context.hex_span_id.to_i(16)]
+              Datadog.logger.debug("Got OpenTelemetry: #{result}")
+              return result
+            end
+          end
+
           return unless Datadog.respond_to?(:tracer) && Datadog.tracer.respond_to?(:active_correlation)
 
           identifier = Datadog.tracer.active_correlation(thread)
