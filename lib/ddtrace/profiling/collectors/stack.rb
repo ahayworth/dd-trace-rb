@@ -172,7 +172,6 @@ module Datadog
 
             if (current_span && current_span != ::OpenTelemetry::Trace::Span::INVALID)
               result = [current_span.context.hex_trace_id[16..-1].to_i(16), current_span.context.hex_span_id.to_i(16)]
-              Datadog.logger.debug("Got OpenTelemetry: #{result}")
               return result
             end
           end
