@@ -24,9 +24,21 @@ module Datadog
           :port,
           :timeout_seconds,
           :deprecated_for_removal_transport_configuration_proc,
-          :deprecated_for_removal_transport_configuration_options,
-          keyword_init: true
-        )
+          :deprecated_for_removal_transport_configuration_options
+        ) do
+          def initialize(
+            ssl:,
+            hostname:,
+            port:,
+            timeout_seconds:,
+            deprecated_for_removal_transport_configuration_proc:,
+            deprecated_for_removal_transport_configuration_options:
+          )
+            super(ssl, hostname, port, timeout_seconds, deprecated_for_removal_transport_configuration_proc, \
+              deprecated_for_removal_transport_configuration_options)
+            freeze
+          end
+        end
 
       def self.call(settings, logger: Datadog.logger)
         new(settings, logger: logger).send(:call)
@@ -164,11 +176,7 @@ module Datadog
         @unparsed_url_from_env ||= ENV[Datadog::Ext::Transport::HTTP::ENV_DEFAULT_URL]
       end
 
-      def pick_from(
-        # Hacky required kw args, we can get rid of this when we drop Ruby 2.0
-        configurations_in_priority_order: raise(ArgumentError, 'missing keyword :configurations'),
-        or_use_default: raise(ArgumentError, 'missing keyword :or_use_default')
-      )
+      def pick_from(configurations_in_priority_order:, or_use_default:)
         detected_configurations_in_priority_order = configurations_in_priority_order.select(&:value?)
 
         if detected_configurations_in_priority_order.any?
@@ -197,7 +205,12 @@ module Datadog
         logger.warn(message) if logger
       end
 
-      DetectedConfiguration = Struct.new(:friendly_name, :value, keyword_init: true) do
+      DetectedConfiguration = Struct.new(:friendly_name, :value) do
+        def initialize(friendly_name:, value:)
+          super(friendly_name, value)
+          freeze
+        end
+
         def value?
           !value.nil?
         end

@@ -47,8 +47,14 @@ RSpec.describe Datadog::Error do
               raise 'root cause'
             end
 
-            def wrapper
+            def middle
               root
+            rescue
+              raise 'middle cause'
+            end
+
+            def wrapper
+              middle
             rescue
               raise 'wrapper layer'
             end
@@ -65,7 +71,7 @@ RSpec.describe Datadog::Error do
           begin
             clazz.new.call
           rescue => e
-            e
+            puts e
           end
         end
 
@@ -73,22 +79,26 @@ RSpec.describe Datadog::Error do
           expect(error.type).to eq('RuntimeError')
           expect(error.message).to eq('wrapper layer')
 
-          wrapper_error_message = /error_spec.rb:\d+:in.*wrapper': wrapper layer \(RuntimeError\)/
-          caller_stack = /from.*error_spec.rb:\d+:in `call'/
-          root_error_message = /error_spec.rb:\d+:in.*root': root cause \(RuntimeError\)/
-          wrapper_stack = /from.*error_spec.rb:\d+:in `wrapper'/
+          # Outer-most error first, inner-most last
+          wrapper_error_message = /in.*wrapper': wrapper layer \(RuntimeError\)/
+          wrapper_caller = /from.*in `call'/
+          middle_error_message = /in.*middle': middle cause \(RuntimeError\)/
+          middle_caller = /from.*in `wrapper'/
+          root_error_message = /in `root': root cause \(RuntimeError\)/
+          root_caller = /from.*in `middle'/
 
           expect(error.backtrace)
             .to match(/
                        #{wrapper_error_message}.*
-                       #{caller_stack}.*
+                       #{wrapper_caller}.*
+                       #{middle_error_message}.*
+                       #{middle_caller}.*
                        #{root_error_message}.*
-                       #{wrapper_stack}.*
-                       #{caller_stack}.*
+                       #{root_caller}.*
                        /mx)
 
           # Expect 2 "first-class" exception lines: 'root cause' and 'wrapper layer'.
-          expect(error.backtrace.each_line.reject { |l| l.start_with?("\tfrom") }).to have(2).items
+          expect(error.backtrace.each_line.reject { |l| l.start_with?("\tfrom") }).to have(3).items
         end
 
         context 'that is reused' do
@@ -107,7 +117,7 @@ RSpec.describe Datadog::Error do
             end
           end
 
-          it 'reports errors only once', if: RUBY_VERSION < '2.6.0' do
+          it 'reports errors only once', if: (RUBY_VERSION < '2.6.0' || PlatformHelpers.truffleruby?) do
             expect(error.type).to eq('RuntimeError')
             expect(error.message).to eq('first error')
 
@@ -117,7 +127,7 @@ RSpec.describe Datadog::Error do
             expect(error.backtrace.each_line.reject { |l| l.start_with?("\tfrom") }).to have(2).items
           end
 
-          it 'reports errors only once', if: RUBY_VERSION >= '2.6.0' do
+          it 'reports errors only once', if: (RUBY_VERSION >= '2.6.0' && !PlatformHelpers.truffleruby?) do
             expect(error.type).to eq('ArgumentError')
             expect(error.message).to eq('circular causes')
 

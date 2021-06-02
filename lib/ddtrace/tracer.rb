@@ -74,7 +74,9 @@ module Datadog
     #   by default.
     def initialize(options = {})
       # Configurable options
-      @context_flush = if options[:partial_flush]
+      @context_flush = if options[:context_flush]
+                         options[:context_flush]
+                       elsif options[:partial_flush]
                          Datadog::ContextFlush::Partial.new(options)
                        else
                          Datadog::ContextFlush::Finished.new
@@ -118,8 +120,10 @@ module Datadog
 
       configure_writer(options)
 
-      if options.key?(:partial_flush)
-        @context_flush = if options[:partial_flush]
+      if options.key?(:context_flush) || options.key?(:partial_flush)
+        @context_flush = if options[:context_flush]
+                           options[:context_flush]
+                         elsif options[:partial_flush]
                            Datadog::ContextFlush::Partial.new(options)
                          else
                            Datadog::ContextFlush::Finished.new
@@ -162,7 +166,7 @@ module Datadog
     #
     #   tracer.set_tags('env' => 'prod', 'component' => 'core')
     def set_tags(tags)
-      string_tags = Hash[tags.collect { |k, v| [k.to_s, v] }]
+      string_tags = tags.collect { |k, v| [k.to_s, v] }.to_h
       @tags = @tags.merge(string_tags)
     end
 

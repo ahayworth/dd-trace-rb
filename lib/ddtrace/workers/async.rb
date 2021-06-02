@@ -12,7 +12,7 @@ module Datadog
         SHUTDOWN_TIMEOUT = 1
 
         def self.included(base)
-          base.send(:prepend, PrependedMethods)
+          base.prepend(PrependedMethods)
         end
 
         # Methods that must be prepended
@@ -39,6 +39,7 @@ module Datadog
           return false unless running?
 
           @run_async = false
+          Datadog.logger.debug { "Forcibly terminating worker thread for: #{self}" }
           worker.terminate
           true
         end
