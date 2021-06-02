@@ -69,15 +69,6 @@ RSpec.describe Datadog::Profiling do
               it { is_expected.to be nil }
             end
           end
-
-          context 'is already loaded' do
-            before do
-              stub_const('::Google::Protobuf', Module.new)
-              allow(described_class).to receive(:protobuf_loaded_successfully?).and_return(true)
-            end
-
-            it { is_expected.to be nil }
-          end
         end
 
         context 'is already loaded' do
