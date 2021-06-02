@@ -24,21 +24,9 @@ module Datadog
           :port,
           :timeout_seconds,
           :deprecated_for_removal_transport_configuration_proc,
-          :deprecated_for_removal_transport_configuration_options
-        ) do
-          def initialize(
-            ssl:,
-            hostname:,
-            port:,
-            timeout_seconds:,
-            deprecated_for_removal_transport_configuration_proc:,
-            deprecated_for_removal_transport_configuration_options:
-          )
-            super(ssl, hostname, port, timeout_seconds, deprecated_for_removal_transport_configuration_proc, \
-              deprecated_for_removal_transport_configuration_options)
-            freeze
-          end
-        end
+          :deprecated_for_removal_transport_configuration_options,
+          keyword_init: true
+        )
 
       def self.call(settings, logger: Datadog.logger)
         new(settings, logger: logger).send(:call)
@@ -205,12 +193,7 @@ module Datadog
         logger.warn(message) if logger
       end
 
-      DetectedConfiguration = Struct.new(:friendly_name, :value) do
-        def initialize(friendly_name:, value:)
-          super(friendly_name, value)
-          freeze
-        end
-
+      DetectedConfiguration = Struct.new(:friendly_name, :value, keyword_init: true) do
         def value?
           !value.nil?
         end
